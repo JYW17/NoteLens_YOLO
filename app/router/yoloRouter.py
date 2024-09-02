@@ -42,11 +42,14 @@ async def process_image(file: UploadFile = File(...)):
 
     # 몽고아이디
     mongo_id = "test_mongo_id"
+    
     # 임시 저장할 파일 경로
     temp_file_path = await yolov5_service.save_temp_file(file)
     logger.info(f"임시 파일 경로: {temp_file_path}")
+    
     # yolo로 이미지 크롭 수행
     yolov5_service.textDetection(temp_file_path, mongo_id)
+    
     # 임시 파일 삭제
     os.remove(temp_file_path)
     logger.info("임시 파일을 성공적으로 삭제했습니다 - 욜로 크롭 수행 종료")
@@ -86,6 +89,7 @@ async def process_image_from_url(image_url: str):
     
     # yolo로 이미지 크롭 수행
     yolov5_service.textDetection(temp_image_path, mongo_id)
+    
     # 임시 파일 삭제
     os.remove(temp_image_path)
     logger.info("임시 파일을 성공적으로 삭제했습니다 - 욜로 크롭 수행 종료")

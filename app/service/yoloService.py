@@ -70,7 +70,8 @@ class YOLOv5Service:
                 response.raise_for_status()
                 result_texts = response.json()
                 self.logger.info("httpx를 통해 ocr 서버의 api로부터 리턴값 받음")
-
+                
+                # OCR 결과값들이 3, 4, 2, 5, 1... 등의 순서로 오는 경우가 있어서 정렬
                 sorted_keys = sorted(result_texts.keys())
                 sorted_data = {key: result_texts[key] for key in sorted_keys}
                 self.logger.info(f"정렬된 json 데이터를 반환합니다.{sorted_data}")
