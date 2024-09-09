@@ -48,16 +48,18 @@ async def process_image(file: UploadFile = File(...)):
     logger.info(f"임시 파일 경로: {temp_file_path}")
     
     # yolo로 이미지 크롭 수행
-    yolov5_service.textDetection(temp_file_path, mongo_id)
+    textDetectionResult = yolov5_service.textDetection(temp_file_path, mongo_id)
+    logger.info(f"yolo로 이미지 크롭 수행 결과: {textDetectionResult}")
     
     # 임시 파일 삭제
     os.remove(temp_file_path)
     logger.info("임시 파일을 성공적으로 삭제했습니다 - 욜로 크롭 수행 종료")
 
-    # 크롭된 이미지들을 OCR 서버로 전송
+    # 크롭된 이미지들을 OCR 서버로 전송, 파일 삭제, 결과 반환
     dir_path = Path("yolov5") / "runs" / "detect" / mongo_id / "crops" / "underline text"
     remove_folder_path = Path("yolov5") / "runs" / "detect" / mongo_id
-    return await yolov5_service.send_cropped_images_to_ocr(dir_path, remove_folder_path, SERVER2_OCR_MULTI_URL)
+    # return await yolov5_service.send_cropped_images_to_ocr(dir_path, remove_folder_path, SERVER2_OCR_MULTI_URL)
+    return {"message": "success"}
 
 
 # URL로 이미지를 받아서 작업하는 API
