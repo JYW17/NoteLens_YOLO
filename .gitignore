@@ -244,3 +244,7 @@ yolov5/runs/
 
 
 yolov5/runs/detect/*
+
+/*.jpg
+
+*.pt
