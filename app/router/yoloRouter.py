@@ -79,7 +79,7 @@ async def process_image_from_url(image_url: str):
         raise HTTPException(status_code=500, detail="Server2 is not healthy")
 
     # 몽고아이디
-    mongo_id = "test_mongo_id"
+    file_id = temp_id.get_id()
 
     # 이미지를 받아서 BytesIO 객체로 변환
     try:
@@ -98,13 +98,13 @@ async def process_image_from_url(image_url: str):
         image_file.write(image_bytes.read())
     
     # yolo로 이미지 크롭 수행
-    yolov5_service.textDetection(temp_image_path, mongo_id)
+    yolov5_service.textDetection(temp_image_path, file_id)
     
     # 임시 파일 삭제
     os.remove(temp_image_path)
     logger.info("임시 파일을 성공적으로 삭제했습니다 - 욜로 크롭 수행 종료")
 
     # 크롭된 이미지들을 OCR 서버로 전송
-    dir_path = Path("yolov5") / "runs" / "detect" / mongo_id / "crops" / "underline text"
-    remove_folder_path = Path("yolov5") / "runs" / "detect" / mongo_id
+    dir_path = Path("yolov5") / "runs" / "detect" / file_id / "crops" # 크롭된 이미지 경로
+    remove_folder_path = Path("yolov5") / "runs" / "detect" / file_id
     return await yolov5_service.send_cropped_images_to_ocr(dir_path, remove_folder_path, SERVER2_OCR_MULTI_URL)
