@@ -64,7 +64,7 @@ async def process_image(file: UploadFile = File(...)):
     logger.info("임시 파일을 성공적으로 삭제했습니다")
 
     # 크롭된 이미지들을 OCR 서버로 전송, 파일 삭제, 결과 반환
-    dir_path = Path("yolov5") / "runs" / "detect" / file_id / "crops" / "underlined_text"
+    dir_path = Path("yolov5") / "runs" / "detect" / file_id / "crops" # 크롭된 이미지 경로
     remove_folder_path = Path("yolov5") / "runs" / "detect" / file_id
     return await yolov5_service.send_cropped_images_to_ocr(dir_path, remove_folder_path, SERVER2_OCR_MULTI_URL)
     # return {"message": "success"}
