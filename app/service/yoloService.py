@@ -16,10 +16,15 @@ class YOLOv5Service:
         self.logger = logging.getLogger(__name__)
         self.logger.info("YOLOv5Service 인스턴스 생성됨")
 
-    def textDetection(self, image_path, mongo_id):
-        self.logger.info(f"textDetection 함수 실행 - 이미지 경로: {image_path}, 몽고 아이디: {mongo_id}")
+    def textDetection(self, image_path, file_id):
+        self.logger.info(f"textDetection 함수 실행 - 이미지 경로: {image_path}, 파일 아이디: {file_id}")
         # 크롭된 이미지들이 경로에 저장됨
-        self.detection(source=image_path, mongo_id=mongo_id)
+        try:
+            self.detection(source=image_path, file_id=file_id)
+            self.logger.info("textDetection 함수 실행 성공")
+        except Exception as e:
+            self.logger.error(f"yolov5 detection 함수 실행 중 에러 발생: {e}")
+            raise HTTPException(status_code=500, detail=f"yolov5 detection 함수 실행 중 에러 발생: {e}")
 
     async def is_server2_healthy(self, health_url):
         self.logger.info(f"서버 상태 확인 - URL: {health_url}")
@@ -34,8 +39,8 @@ class YOLOv5Service:
                 return False
         return False
 
-    async def save_temp_file(self, file) -> str:
-        temp_file_path = f"temp_{file.filename}"
+    async def save_temp_file(self, file, file_id) -> str:
+        temp_file_path = f"temp_{file_id}.jpg"
         with open(temp_file_path, "wb") as buffer:
             buffer.write(await file.read())
         self.logger.info(f"임시 파일 저장 - 경로: {temp_file_path}")
@@ -49,17 +54,26 @@ class YOLOv5Service:
             f = open(file_path, "rb")
             files_data.append(('files', (file_path.name, f, 'image/jpeg')))
             open_files.append(f)
+        
+        # 송신한 정보들 로깅
+        self.logger.info(f"httpx를 통해 송신한 정보들: {files_data}")
 
+        # 크롭된 이미지 파일이 없는 경우
         if not files_data:
+            # 파일 객체 닫기
             for f in open_files:
                 f.close()
             self.logger.info("모든 파일 객체를 닫았습니다.")
+            
+            # 폴더 삭제
             if os.path.exists(remove_folder_path):
                 shutil.rmtree(remove_folder_path)
                 self.logger.info(f"폴더 '{remove_folder_path}' 가 성공적으로 삭제되었습니다.")
             else:
                 self.logger.info(f"폴더 '{remove_folder_path}' 가 존재하지 않습니다.")
             self.logger.error("크롭된 이미지 파일이 존재하지 않습니다.")
+            
+            # 404 에러 발생
             raise HTTPException(status_code=404, detail="크롭된 이미지 파일이 존재하지 않습니다.")
 
         self.logger.info(f"httpx 작업 전 - 수신지 url: {ocr_url}")
@@ -74,7 +88,23 @@ class YOLOv5Service:
                 # OCR 결과값들이 3, 4, 2, 5, 1... 등의 순서로 오는 경우가 있어서 정렬
                 sorted_keys = sorted(result_texts.keys())
                 sorted_data = {key: result_texts[key] for key in sorted_keys}
-                self.logger.info(f"정렬된 json 데이터를 반환합니다.{sorted_data}")
+                self.logger.info(f"정렬된 json 데이터를 반환: {sorted_data}")
+                
+                # 원래 보낸 파일들의 이름을 추출
+                sent_file_names = [file_data[1][0] for file_data in files_data]
+                self.logger.info(f"송신한 파일 리스트: {sent_file_names}")
+
+                # OCR 서버에서 처리된 파일들의 이름을 추출
+                received_file_names = list(result_texts.keys())
+                self.logger.info(f"OCR 서버에서 받은 파일 리스트: {received_file_names}")
+
+                # 누락된 파일 확인
+                missing_files = set(sent_file_names) - set(received_file_names)
+                if missing_files:
+                    self.logger.warning(f"누락된 파일: {missing_files}")
+                else:
+                    self.logger.info("모든 파일이 성공적으로 처리되었습니다.")
+                
                 return sorted_data
 
             except httpx.TimeoutException:
@@ -98,3 +128,4 @@ class YOLOv5Service:
                     self.logger.info(f"폴더 '{remove_folder_path}' 가 성공적으로 삭제되었습니다.")
                 else:
                     self.logger.info(f"폴더 '{remove_folder_path}' 가 존재하지 않습니다.")
+                
