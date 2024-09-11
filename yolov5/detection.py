@@ -110,7 +110,7 @@ def run(
     half=False,  # use FP16 half-precision inference
     dnn=False,  # use OpenCV DNN for ONNX inference
     vid_stride=1,  # video frame-rate stride
-    mongo_id="test_id", # mongoDB id
+    file_id="test_file_id",  # File ID
 ):
     
     
@@ -122,11 +122,9 @@ def run(
     conf_thres=0.1 # 객체 확률을 0.65이상인 것들만 탐지
     nosave = False # 결과 이미지 저장
     
-    # 나중에 매개변수의 mongo_id로 수정    
-    mongo_id = mongo_id
-    name = mongo_id
+    name = file_id
     
-    # yolov5/runs/detect/{mongo_id}로 save_dir 설정
+    # yolov5/runs/detect/{file_id}로 save_dir 설정
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run 
     print("save_dir: ", save_dir)
     (save_dir / "labels" if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
@@ -261,8 +259,8 @@ def run(
                         annotator.box_label(xyxy, label, color=colors(c, True))
                     if save_crop: # 크롭된 이미지 저장 경로 수정 가능
                         # crop/label_name 형태로 저장
-                        # crop/label_name/mongo_id,2,3... .jpg
-                        save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{mongo_id}.jpg", BGR=True)
+                        # crop/label_name/file_id,2,3... .jpg
+                        save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{file_id}.jpg", BGR=True)
 
             # Stream results
             im0 = annotator.result()
@@ -337,7 +335,7 @@ def parse_opt():
     parser.add_argument("--half", action="store_true", help="use FP16 half-precision inference")
     parser.add_argument("--dnn", action="store_true", help="use OpenCV DNN for ONNX inference")
     parser.add_argument("--vid-stride", type=int, default=1, help="video frame-rate stride")
-    parser.add_argument("--mongo_id", type=str, default=None, help="mongoDB id")
+    parser.add_argument("--file_id", type=str, default="test_file_id", help="File ID")
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
