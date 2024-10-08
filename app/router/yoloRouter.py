@@ -28,8 +28,18 @@ yoloRouter = APIRouter()
 
 # 서버2의 주소 및 OCR 서비스 주소
 SERVER2_HEALTH_URL = "http://43.203.54.176:8000/api/test/health"
-SERVER2_OCR_MULTI_URL = "http://43.203.54.176:8000/api/ocr/ocr-multi"  # 이민섭 ocr서버 api 주소
-# SERVER2_OCR_MULTI_URL = "http://43.203.93.209:8000/api/ocr/ocr-multi"  # 주영운 ec2의 ocr서버 api 주소
+SERVER2_OCR_MULTI_URL = "http://43.203.54.176:8000/api/ocr/ocr-multi"    # 이민섭 ocr서버 api 주소
+# SERVER2_OCR_MULTI_URL = "http://43.203.93.209:8000/api/ocr/ocr-multi"  # 주영운 ocr서버 api 주소 !!사용 안 함!!
+
+# 식별자
+class Temp_id:
+    def __init__(self):
+        self.id = 0
+    def get_id(self):
+        self.id += 1
+        return f"No_{self.id}_file"
+
+temp_id = Temp_id()
 
 # 파일을 직접 받아서 작업하는 API
 @yoloRouter.post("/yolo", response_model=dict)
@@ -39,22 +49,25 @@ async def process_image(file: UploadFile = File(...)):
     if not await yolov5_service.is_server2_healthy(SERVER2_HEALTH_URL):
         logger.error("Server2 is not healthy")
         raise HTTPException(status_code=500, detail="Server2 is not healthy")
-
-    # 몽고아이디
-    mongo_id = "test_mongo_id"
+    
     # 임시 저장할 파일 경로
-    temp_file_path = await yolov5_service.save_temp_file(file)
+    file_id = temp_id.get_id()
+    temp_file_path = await yolov5_service.save_temp_file(file, file_id)
     logger.info(f"임시 파일 경로: {temp_file_path}")
+    
     # yolo로 이미지 크롭 수행
-    yolov5_service.textDetection(temp_file_path, mongo_id)
+    textDetectionResult = yolov5_service.textDetection(temp_file_path, file_id)
+    logger.info(f"yolo로 이미지 크롭 수행 결과: {textDetectionResult}")
+    
     # 임시 파일 삭제
     os.remove(temp_file_path)
-    logger.info("임시 파일을 성공적으로 삭제했습니다 - 욜로 크롭 수행 종료")
+    logger.info("임시 파일을 성공적으로 삭제했습니다")
 
-    # 크롭된 이미지들을 OCR 서버로 전송
-    dir_path = Path("yolov5") / "runs" / "detect" / mongo_id / "crops" / "underline text"
-    remove_folder_path = Path("yolov5") / "runs" / "detect" / mongo_id
+    # 크롭된 이미지들을 OCR 서버로 전송, 파일 삭제, 결과 반환
+    dir_path = Path("yolov5") / "runs" / "detect" / file_id / "crops" # 크롭된 이미지 경로
+    remove_folder_path = Path("yolov5") / "runs" / "detect" / file_id
     return await yolov5_service.send_cropped_images_to_ocr(dir_path, remove_folder_path, SERVER2_OCR_MULTI_URL)
+    # return {"message": "success"}
 
 
 # URL로 이미지를 받아서 작업하는 API
@@ -66,7 +79,7 @@ async def process_image_from_url(image_url: str):
         raise HTTPException(status_code=500, detail="Server2 is not healthy")
 
     # 몽고아이디
-    mongo_id = "test_mongo_id"
+    file_id = temp_id.get_id()
 
     # 이미지를 받아서 BytesIO 객체로 변환
     try:
@@ -85,12 +98,13 @@ async def process_image_from_url(image_url: str):
         image_file.write(image_bytes.read())
     
     # yolo로 이미지 크롭 수행
-    yolov5_service.textDetection(temp_image_path, mongo_id)
+    yolov5_service.textDetection(temp_image_path, file_id)
+    
     # 임시 파일 삭제
     os.remove(temp_image_path)
     logger.info("임시 파일을 성공적으로 삭제했습니다 - 욜로 크롭 수행 종료")
 
     # 크롭된 이미지들을 OCR 서버로 전송
-    dir_path = Path("yolov5") / "runs" / "detect" / mongo_id / "crops" / "underline text"
-    remove_folder_path = Path("yolov5") / "runs" / "detect" / mongo_id
+    dir_path = Path("yolov5") / "runs" / "detect" / file_id / "crops" # 크롭된 이미지 경로
+    remove_folder_path = Path("yolov5") / "runs" / "detect" / file_id
     return await yolov5_service.send_cropped_images_to_ocr(dir_path, remove_folder_path, SERVER2_OCR_MULTI_URL)

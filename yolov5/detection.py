@@ -46,6 +46,10 @@ else:
 #If you have linux (or deploying for linux) use:
     from pathlib import Path
 
+# 추가된 패키지 ========================================
+from operator import itemgetter
+#=====================================================
+
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -100,29 +104,27 @@ def run(
     project=ROOT / "runs/detect",  # save results to project/name
     name="exp",  # save results to project/name
     exist_ok=False,  # existing project/name ok, do not increment
-    line_thickness=3,  # bounding box thickness (pixels)
+    line_thickness=1,  # bounding box thickness (pixels)
     hide_labels=False,  # hide labels
     hide_conf=False,  # hide confidences
     half=False,  # use FP16 half-precision inference
     dnn=False,  # use OpenCV DNN for ONNX inference
     vid_stride=1,  # video frame-rate stride
-    mongo_id="test_id", # mongoDB id
+    file_id="test_file_id",  # File ID
 ):
     
     
     ####################################
     
     # Directories
-    weights = ROOT / "weights/best.pt"
+    weights = ROOT / "weights/underline+circle_yolov5x_10_07_best.pt"
     save_crop = True
-    conf_thres=0.65 # 객체 확률을 0.65이상인 것들만 탐지
-    nosave = True # 결과 이미지 저장 안함
+    conf_thres=0.6 # 객체 확률을 0.6 이상인 것들만 탐지, 현재 테스트 시 결과 확인을 위해 0.1로 설정
+    nosave = False # 결과 이미지 저장
     
-    # 나중에 매개변수의 mongo_id로 수정    
-    mongo_id = mongo_id
-    name = mongo_id
+    name = file_id
     
-    # yolov5/runs/detect/{mongo_id}로 save_dir 설정
+    # yolov5/runs/detect/{file_id}로 save_dir 설정
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run 
     print("save_dir: ", save_dir)
     (save_dir / "labels" if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
@@ -222,7 +224,7 @@ def run(
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
-            
+                 
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
@@ -232,8 +234,11 @@ def run(
                     n = (det[:, 5] == c).sum()  # detections per class
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
+                # 정렬된 det
+                det_sorted = sorted(det, key=itemgetter(1, 0)) # 상하좌우 순으로 정렬(글을 읽듯이)
+                
                 # Write results
-                for *xyxy, conf, cls in reversed(det):
+                for *xyxy, conf, cls in det_sorted:
                     c = int(cls)  # integer class
                     label = names[c] if hide_conf else f"{names[c]}"
                     confidence = float(conf)
@@ -254,8 +259,8 @@ def run(
                         annotator.box_label(xyxy, label, color=colors(c, True))
                     if save_crop: # 크롭된 이미지 저장 경로 수정 가능
                         # crop/label_name 형태로 저장
-                        # crop/label_name/mongo_id,2,3... .jpg
-                        save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{mongo_id}.jpg", BGR=True)
+                        # crop/label_name/file_id,2,3... .jpg
+                        save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{file_id}.jpg", BGR=True)
 
             # Stream results
             im0 = annotator.result()
@@ -330,7 +335,7 @@ def parse_opt():
     parser.add_argument("--half", action="store_true", help="use FP16 half-precision inference")
     parser.add_argument("--dnn", action="store_true", help="use OpenCV DNN for ONNX inference")
     parser.add_argument("--vid-stride", type=int, default=1, help="video frame-rate stride")
-    parser.add_argument("--mongo_id", type=str, default=None, help="mongoDB id")
+    parser.add_argument("--file_id", type=str, default="test_file_id", help="File ID")
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
