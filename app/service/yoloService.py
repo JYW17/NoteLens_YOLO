@@ -7,6 +7,12 @@ import httpx
 from fastapi import HTTPException
 from yolov5 import detection
 
+import requests
+import uuid
+import time
+import json
+
+
 # 로그 설정
 logging.config.fileConfig('app/config/logging_config.ini')
 
@@ -126,5 +132,73 @@ class YOLOv5Service:
         if os.path.exists(remove_folder_path):
             shutil.rmtree(remove_folder_path)
             self.logger.info(f"폴더 '{remove_folder_path}' 및 가 성공적으로 삭제되었습니다.")
+        
+        return categorized_data
+
+
+
+
+    # 클로바 OCR API 사용
+    async def send_cropped_images_to_clovaOCR(self, dir_path: Path, remove_folder_path: Path, ocr_url: str, api_secret_key: str) -> dict:
+        self.logger.info(f"send_cropped_images_to_clovaOCR 함수 실행 - 이미지 경로: {dir_path}, 삭제할 폴더 경로: {remove_folder_path}, OCR 서버 URL: {ocr_url})")
+
+        categorized_data = {}
+        
+        # 클로바 OCR 요청 URL 및 비밀 키
+        api_url = ocr_url
+        secret_key = api_secret_key
+        
+        # 크롭된 이미지 파일들을 클로바 OCR로 전송
+        for category_dir in (d for d in dir_path.iterdir() if d.is_dir() and os.listdir(d)):
+            self.logger.info(f"처리 중인 카테고리 디렉토리: {category_dir}")
+            
+            responses = []
+            
+            # 카테고리별 이미지 파일 처리
+            for file_path in category_dir.glob("*.jpg"):
+                image_file = file_path
+                
+                # 클로바 OCR 요청 JSON
+                request_json = {
+                    'images': [
+                        {
+                            'format': 'jpg',
+                            'name': file_path.name,
+                        }
+                    ],
+                    'requestId': str(uuid.uuid4()),
+                    'version': 'V2',
+                    'timestamp': int(round(time.time() * 1000))
+                }
+
+                # 요청 데이터 생성
+                payload = {'message': json.dumps(request_json).encode('UTF-8')}
+                files = [('file', open(image_file, 'rb'))]
+                
+                # 헤더에 비밀 키 추가
+                headers = {
+                    'X-OCR-SECRET': secret_key
+                }
+
+                # 요청 보내기
+                try:
+                    response = requests.post(api_url, headers=headers, data=payload, files=files)
+                    response.raise_for_status()  # 요청이 실패하면 HTTPError 발생
+                    responses.append(response.json())  # 응답을 JSON으로 변환하여 저장
+                    self.logger.info(f"OCR 결과 응답: {response.json()}")
+                except requests.exceptions.RequestException as exc:
+                    self.logger.error(f"Request error while requesting Clova OCR API: {exc}")
+                    raise HTTPException(status_code=500, detail=f"Error while requesting Clova OCR API: {exc}")
+                finally:
+                    # 파일 닫기
+                    files[0][1].close()
+            
+            categorized_data[category_dir.name] = responses  # 카테고리별로 응답 저장
+            self.logger.info(f"카테고리 '{category_dir}' 의 OCR 결과값 추가 성공")
+
+        # 임시 파일 삭제
+        if os.path.exists(remove_folder_path):
+            shutil.rmtree(remove_folder_path)
+            self.logger.info(f"폴더 '{remove_folder_path}' 가 성공적으로 삭제되었습니다.")
         
         return categorized_data
