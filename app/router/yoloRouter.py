@@ -6,6 +6,8 @@ from pathlib import Path
 import logging
 from app.service.yoloService import YOLOv5Service
 
+from app.config import apikey, serverURL
+
 # 로그 설정
 logging.config.fileConfig('app/config/logging_config.ini')
 logger = logging.getLogger(__name__)
@@ -27,9 +29,11 @@ yoloRouter = APIRouter()
 # SERVER2_OCR_MULTI_URL = "http://localhost:8000/api/ocr/ocr-multi"  # 로컬 테스트용 주소
 
 # 서버2의 주소 및 OCR 서비스 주소
-SERVER2_HEALTH_URL = "http://43.203.54.176:8000/api/test/health"
-SERVER2_OCR_MULTI_URL = "http://43.203.54.176:8000/api/ocr/ocr-multi"    # 이민섭 ocr서버 api 주소
-# SERVER2_OCR_MULTI_URL = "http://43.203.93.209:8000/api/ocr/ocr-multi"  # 주영운 ocr서버 api 주소 !!사용 안 함!!
+SERVER2_HEALTH_URL = serverURL.SERVER2_HEALTH_URL
+SERVER2_OCR_MULTI_URL = serverURL.SERVER2_OCR_MULTI_URL    # 이민섭 ocr서버 api 주소
+
+CLOVA_OCR_URL = serverURL.CLOVA_OCR_URL
+CLOVA_SECRET_KEY = apikey.CLOVA_OCR_API_KEY
 
 # 식별자
 class Temp_id:
@@ -66,7 +70,7 @@ async def process_image(file: UploadFile = File(...)):
     # 크롭된 이미지들을 OCR 서버로 전송, 파일 삭제, 결과 반환
     dir_path = Path("yolov5") / "runs" / "detect" / file_id / "crops" # 크롭된 이미지 경로
     remove_folder_path = Path("yolov5") / "runs" / "detect" / file_id
-    return await yolov5_service.send_cropped_images_to_ocr(dir_path, remove_folder_path, SERVER2_OCR_MULTI_URL)
+    return await yolov5_service.send_cropped_images_to_ocr(dir_path, remove_folder_path, SERVER2_OCR_MULTI_URL, api_secret_key=CLOVA_SECRET_KEY, api_url=CLOVA_SECRET_KEY)
     # return {"message": "success"}
 
 
@@ -108,3 +112,27 @@ async def process_image_from_url(image_url: str):
     dir_path = Path("yolov5") / "runs" / "detect" / file_id / "crops" # 크롭된 이미지 경로
     remove_folder_path = Path("yolov5") / "runs" / "detect" / file_id
     return await yolov5_service.send_cropped_images_to_ocr(dir_path, remove_folder_path, SERVER2_OCR_MULTI_URL)
+
+
+# 클로바 OCR 서버로 이미지를 받아서 작업하는 API
+@yoloRouter.post("/yolo_clova", response_model=dict)
+async def process_image(file: UploadFile = File(...)):
+    
+    # 임시 저장할 파일 경로
+    file_id = temp_id.get_id()
+    temp_file_path = await yolov5_service.save_temp_file(file, file_id)
+    logger.info(f"임시 파일 경로: {temp_file_path}")
+    
+    # yolo로 이미지 크롭 수행
+    textDetectionResult = yolov5_service.textDetection(temp_file_path, file_id)
+    logger.info(f"yolo로 이미지 크롭 수행 결과: {textDetectionResult}")
+    
+    # 임시 파일 삭제
+    os.remove(temp_file_path)
+    logger.info("임시 파일을 성공적으로 삭제했습니다")
+
+    # 크롭된 이미지들을 OCR 서버로 전송, 파일 삭제, 결과 반환
+    dir_path = Path("yolov5") / "runs" / "detect" / file_id / "crops" # 크롭된 이미지 경로
+    remove_folder_path = Path("yolov5") / "runs" / "detect" / file_id
+    return await yolov5_service.send_cropped_images_to_clovaOCR(dir_path, remove_folder_path, SERVER2_OCR_MULTI_URL, api_secret_key=CLOVA_SECRET_KEY, api_url=CLOVA_SECRET_KEY)
+    # return {"message": "success"}

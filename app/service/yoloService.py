@@ -128,3 +128,89 @@ class YOLOv5Service:
             self.logger.info(f"폴더 '{remove_folder_path}' 및 가 성공적으로 삭제되었습니다.")
         
         return categorized_data
+
+
+
+    # 클로바 api 사용(아직 미완성)
+    async def send_cropped_images_to_clovaOCR(self, dir_path: Path, remove_folder_path: Path, ocr_url: str, api_secret_key: str) -> dict:
+            
+            categorized_data = {}
+            
+            # 크롭된 이미지들의 루트 폴더에서 하위 객체 폴더들 속 파일들에 대해 OCR 서버로 요청을 보내고 결과값을 반환
+            for category_dir in dir_path.iterdir():
+                if category_dir.is_dir():  # 하위 디렉토리만 처리
+                    self.logger.info(f"처리 중인 카테고리 디렉토리: {category_dir}")
+
+                    files_data = []
+                    open_files = []
+
+                    # 하위 디렉토리 내 이미지 파일들을 처리
+                    for file_path in category_dir.glob("*.jpg"):
+                        f = open(file_path, "rb")
+                        files_data.append(('files', (file_path.name, f, 'image/jpeg')))
+                        open_files.append(f)
+
+                    # 크롭된 이미지 파일이 없는 경우
+                    if not files_data:
+                        # 파일 객체 닫기
+                        for f in open_files:
+                            f.close()
+                        self.logger.info(f"카테고리 '{category_dir}' 에 이미지 파일이 없습니다.")
+                        continue
+
+                    # OCR 서버로 전송
+                    self.logger.info(f"{category_dir} 디렉토리의 이미지를 OCR 서버로 전송")
+                    async with httpx.AsyncClient() as client:
+                        try:
+                            timeout_limit = 45
+                            response = await client.post(url=ocr_url, files=files_data, timeout=timeout_limit)
+                            response.raise_for_status()
+                            result_texts = response.json()
+
+                            # 파일 이름 기준으로 정렬
+                            sorted_keys = sorted(result_texts.keys())
+                            sorted_data = {key: result_texts[key] for key in sorted_keys}
+                            self.logger.info(f"{category_dir} 디렉토리의 OCR 결과: {sorted_data}")
+
+                            # 보낸 파일과 받은 파일 비교
+                            sent_file_names = [file_data[1][0] for file_data in files_data]
+                            received_file_names = list(result_texts.keys())
+                            missing_files = set(sent_file_names) - set(received_file_names)
+
+                            if missing_files:
+                                self.logger.warning(f"카테고리 '{category_dir}' 에서 누락된 파일: {missing_files}")
+                            else:
+                                self.logger.info(f"카테고리 '{category_dir}' 의 모든 파일이 성공적으로 처리되었습니다.")
+                            
+                            # 결과값 저장
+                            categorized_data[category_dir.name] = sorted_data
+                            self.logger.info(f"카테고리 '{category_dir}' 의 OCR 결과값 추가 성공")
+
+                        except httpx.TimeoutException:
+                            self.logger.error("Request timeout while requesting server2")
+                            raise HTTPException(status_code=504, detail=f"Server2 did not respond in time. timeout limit is {timeout_limit} seconds.")
+                        except httpx.RequestError as exc:
+                            self.logger.error(f"Request error while requesting server2: {exc}")
+                            raise HTTPException(status_code=500, detail=f"Error while requesting server2: {exc}")
+                        except httpx.HTTPStatusError as exc:
+                            self.logger.error(f"HTTP error response from server2: {exc.response.text}")
+                            raise HTTPException(status_code=exc.response.status_code, detail=f"Error response from server2: {exc.response.text}")
+                        except Exception as exc:
+                            self.logger.error(f"Unexpected error: {exc}")
+                            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {exc}")
+
+                        finally:
+                            # 파일 객체 닫기
+                            for f in open_files:
+                                f.close()
+                            # # 카테고리 폴더 삭제
+                            # if os.path.exists(category_dir):
+                            #     shutil.rmtree(category_dir)
+                            #     self.logger.info(f"폴더 '{category_dir}' 가 성공적으로 삭제되었습니다.")
+            
+            # file_id에 대한 디렉토리 삭제
+            if os.path.exists(remove_folder_path):
+                shutil.rmtree(remove_folder_path)
+                self.logger.info(f"폴더 '{remove_folder_path}' 및 가 성공적으로 삭제되었습니다.")
+            
+            return categorized_data
