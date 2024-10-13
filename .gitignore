@@ -246,5 +246,7 @@ yolov5/runs/
 
 
 yolov5/runs/detect/*
+yolov5/weights/yolov5x_each_best.pt
+
 
 /*.jpg
