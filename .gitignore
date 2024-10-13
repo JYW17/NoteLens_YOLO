@@ -240,6 +240,8 @@ images
 app/ai/test/images/*.jpg
 app/test/notes/*
 
+app/config/apikey.py
+
 yolov5/runs/
 
 
