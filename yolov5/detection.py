@@ -116,12 +116,9 @@ def run(
     
     ####################################
     
-    # Directories
     weights = ROOT / "weights/underline+circle_yolov5m_10_07_best.pt"
-    save_crop = True
-    conf_thres=0.6 # 객체 확률을 0.6 이상인 것들만 탐지, 현재 테스트 시 결과 확인을 위해 0.1로 설정
-    nosave = False # 결과 이미지 저장
     
+    nosave = False # 결과 이미지 저장
     name = file_id
     
     # yolov5/runs/detect/{file_id}로 save_dir 설정
