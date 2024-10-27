@@ -136,3 +136,54 @@ async def use_clovaOCR(file: UploadFile = File(...)):
     remove_folder_path = Path("yolov5") / "runs" / "detect" / file_id
     return await yolov5_service.send_cropped_images_to_clovaOCR(dir_path=dir_path, remove_folder_path=remove_folder_path, ocr_url=CLOVA_OCR_URL,  api_secret_key=CLOVA_SECRET_KEY)
     # return {"message": "success"} 
+
+
+
+### 아직 테스트 중인 API
+# 클로바 OCR을 한 번만 쓰는 API
+@yoloRouter.post("/yolo_clova_once", response_model=dict)
+async def use_clovaOCR(file: UploadFile = File(...)):
+    
+    # 임시 저장할 파일 경로
+    file_id = temp_id.get_id()
+    temp_file_path = await yolov5_service.save_temp_file(file, file_id)
+    logger.info(f"임시 파일 경로: {temp_file_path}")
+    
+    # yolo로 이미지 크롭 수행
+    textDetectionResult = yolov5_service.textDetection(temp_file_path, file_id, save_csv=True, save_txt=True, save_crop=False, conf_thres=0.3)
+    yolo_result_file = Path("yolov5") / "runs" / "detect" / file_id / "results" / "results.csv"
+    logger.info(f"yolo로 이미지 크롭 수행 결과: {textDetectionResult}")
+    
+    # 클로바 OCR 서버로 전송
+    remove_folder_path = Path("yolov5") / "runs" / "detect" / file_id
+    clova_result = await yolov5_service.send_original_image_to_clovaOCR(img_path=temp_file_path, remove_folder_path=remove_folder_path, ocr_url=CLOVA_OCR_URL,  api_secret_key=CLOVA_SECRET_KEY)
+    
+    # 임시 파일 삭제
+    os.remove(temp_file_path)
+    logger.info("임시 파일을 성공적으로 삭제했습니다")
+    
+    # yolo, clova 결과를 비교하여 결과 반환
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    # 크롭된 이미지들을 OCR 서버로 전송, 파일 삭제, 결과 반환
+    # dir_path = Path("yolov5") / "runs" / "detect" / file_id / "crops" # 크롭된 이미지 경로
+    # yolo_result = 
+    # await yolov5_service.send_cropped_images_to_clovaOCR(dir_path=dir_path, remove_folder_path=remove_folder_path, ocr_url=CLOVA_OCR_URL,  api_secret_key=CLOVA_SECRET_KEY)
+    
+    
+    
+    
+    
+    # return {"message": "success"} 

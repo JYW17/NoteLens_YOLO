@@ -22,11 +22,13 @@ class YOLOv5Service:
         self.logger = logging.getLogger(__name__)
         self.logger.info("YOLOv5Service 인스턴스 생성됨")
 
-    def textDetection(self, image_path, file_id):
+    def textDetection(self, image_path, file_id, save_csv=False, save_txt=False, save_crop=True, conf_thres=0.6):
         self.logger.info(f"textDetection 함수 실행 - 이미지 경로: {image_path}, 파일 아이디: {file_id}")
         # 크롭된 이미지들이 경로에 저장됨
         try:
-            self.detection(source=image_path, file_id=file_id)
+            # 추가할 매개변수가 뭐가 있을까...
+            # save_txt, save_crop, conf_thres, name
+            self.detection(source=image_path, file_id=file_id, save_csv=save_csv, save_txt=save_txt, save_crop=save_crop, conf_thres=conf_thres)
             self.logger.info("textDetection 함수 실행 성공")
         except Exception as e:
             self.logger.error(f"yolov5 detection 함수 실행 중 에러 발생: {e}")
@@ -46,7 +48,7 @@ class YOLOv5Service:
         return False
 
     async def save_temp_file(self, file, file_id) -> str:
-        temp_file_path = f"temp_{file_id}.jpg"
+        temp_file_path = f"{file_id}.jpg"
         with open(temp_file_path, "wb") as buffer:
             buffer.write(await file.read())
         self.logger.info(f"임시 파일 저장 - 경로: {temp_file_path}")
@@ -147,6 +149,100 @@ class YOLOv5Service:
         # 클로바 OCR 요청 URL 및 비밀 키
         api_url = ocr_url
         secret_key = api_secret_key
+        
+        # 크롭된 이미지 파일들을 클로바 OCR로 전송
+        for category_dir in (d for d in dir_path.iterdir() if d.is_dir() and os.listdir(d)):
+            self.logger.info(f"처리 중인 카테고리 디렉토리: {category_dir}")
+            
+            responses = []
+            
+            # 카테고리별 이미지 파일 처리
+            for file_path in category_dir.glob("*.jpg"):
+                image_file = file_path
+                
+                # 클로바 OCR 요청 JSON
+                request_json = {
+                    'images': [
+                        {
+                            'format': 'jpg',
+                            'name': file_path.name,
+                        }
+                    ],
+                    'requestId': str(uuid.uuid4()),
+                    'version': 'V2',
+                    'timestamp': int(round(time.time() * 1000))
+                }
+
+                # 요청 데이터 생성
+                payload = {'message': json.dumps(request_json).encode('UTF-8')}
+                files = [('file', open(image_file, 'rb'))]
+                
+                # 헤더에 비밀 키 추가
+                headers = {
+                    'X-OCR-SECRET': secret_key
+                }
+
+                # 요청 보내기
+                try:
+                    response = requests.post(api_url, headers=headers, data=payload, files=files)
+                    response.raise_for_status()  # 요청이 실패하면 HTTPError 발생
+                    responses.append(response.json())  # 응답을 JSON으로 변환하여 저장
+                    self.logger.info(f"OCR 결과 응답: {response.json()}")
+                except requests.exceptions.RequestException as exc:
+                    self.logger.error(f"Request error while requesting Clova OCR API: {exc}")
+                    raise HTTPException(status_code=500, detail=f"Error while requesting Clova OCR API: {exc}")
+                finally:
+                    # 파일 닫기
+                    files[0][1].close()
+            
+            categorized_data[category_dir.name] = responses  # 카테고리별로 응답 저장
+            self.logger.info(f"카테고리 '{category_dir}' 의 OCR 결과값 추가 성공")
+
+        # 임시 파일 삭제
+        if os.path.exists(remove_folder_path):
+            shutil.rmtree(remove_folder_path)
+            self.logger.info(f"폴더 '{remove_folder_path}' 가 성공적으로 삭제되었습니다.")
+        
+        return categorized_data
+
+
+    # 클로바 OCR API 한 번만 사용
+    async def send_original_image_to_clovaOCR(self, img_path: Path, remove_folder_path: Path, ocr_url: str, api_secret_key: str) -> dict:
+        self.logger.info(f"send_cropped_images_to_clovaOCR 함수 실행 - 이미지 경로: {dir_path}, 삭제할 폴더 경로: {remove_folder_path}, OCR 서버 URL: {ocr_url})")
+
+        categorized_data = {}
+        
+        # 클로바 OCR 요청 URL 및 비밀 키
+        api_url = ocr_url
+        secret_key = api_secret_key
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         
         # 크롭된 이미지 파일들을 클로바 OCR로 전송
         for category_dir in (d for d in dir_path.iterdir() if d.is_dir() and os.listdir(d)):
