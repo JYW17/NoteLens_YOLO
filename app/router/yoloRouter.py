@@ -168,6 +168,12 @@ async def use_clovaOCR(file: UploadFile = File(...)):
         logger.error(f"클로바 OCR 서버로 이미지 전송 중 오류 발생: {e}")
         raise HTTPException(status_code=500, detail="클로바 OCR 서버로 이미지 전송 중 오류 발생")
     
+    # 전체적인 내용을 original_content에 저장
+    original_content = ""
+    if clova_result and 'images' in clova_result:
+        for image_data in clova_result['images']:
+            for field in image_data.get('fields', []):
+                original_content += field.get('inferText', '') + " "
     
     # 확인용 파일 저장
     write_path = Path("yolov5") / "runs" / "detect" / file_id / "clova_result" / f"{file_id}.json"
@@ -177,11 +183,11 @@ async def use_clovaOCR(file: UploadFile = File(...)):
         json.dump(clova_result, f, ensure_ascii=False, indent=4)  # JSON으로 변환 후 저장
     logger.info(f"클로바 OCR 결과 저장 완료: {write_path}")
     
-    
+    # 이미지 파일의 크기 대입
     with Image.open(temp_file_path) as img:
         image_width, image_height = img.size
 
-    # YOLO 텍스트 파일을 읽어 절대 좌표로 변환
+    # YOLO 텍스트 파일을 읽어 상대 좌표를 절대 좌표로 변환
     def parse_yolo_txt(yolo_txt_path):
         yolo_boxes = []
         with open(yolo_txt_path, 'r') as f:
@@ -296,8 +302,9 @@ async def use_clovaOCR(file: UploadFile = File(...)):
     yolo_boxes = parse_yolo_txt(yolo_txt_path)
     clova_boxes = parse_clova_json(clova_json_path)
     matched_data = match_yolo_with_clova(yolo_boxes, clova_boxes, overlap_threshold=N)
+    
+    result_data = {"original_content": original_content}
+    result_data.update(matched_data)
     logger.info(f"탐지된 문장: {matched_data}")
     
-    
-    
-    return matched_data
+    return result_data
