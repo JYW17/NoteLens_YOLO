@@ -3,10 +3,9 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 import os
 import logging
-import logging.config
 
 # 로그 설정 파일을 로드하여 설정 적용
-logging.config.fileConfig('app/config/logging_config.ini')
+# logging.config.fileConfig('app/config/logging_config.ini')
 
 # 로거 생성
 logger = logging.getLogger(__name__)
