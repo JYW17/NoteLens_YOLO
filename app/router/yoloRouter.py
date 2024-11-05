@@ -251,45 +251,30 @@ async def use_clovaOCR(file: UploadFile = File(...)):
             class_id = yolo_box["class_id"]
             yolo_bbox = yolo_box["bbox"]
             included_texts = []
-            
+
             for clova_box in clova_boxes:
                 clova_bbox = clova_box["bbox"]
                 infer_text = clova_box["text"]
-                
+
                 # 겹치는 비율 계산
                 overlap_ratio = calculate_iou(yolo_bbox, clova_bbox)
-                
+
                 # 겹치는 비율이 설정된 threshold 이상인 경우 텍스트 포함
                 if overlap_ratio >= overlap_threshold:
                     included_texts.append(infer_text)
-            
-            
-            # 결과를 클래스별로 정리
-            
-            # 텍스트들로 구성된 딕셔너리를 생성하여 저장
-            # if included_texts:
-            #     class_name = yolov5_service.class_names.get(class_id, f"unknown_class_{class_id}")
-            #     if class_name not in result:
-            #         result[class_name] = []
-                
-            #     text_entry = {"texts_" + str(len(result[class_name]) + 1): included_texts}
-                
-            #     result[class_name].append(text_entry)
-                
-            
+
             # 텍스트들을 문장 형태로 결합하여 저장
             if included_texts:
-                
                 class_name = yolov5_service.class_names.get(class_id, f"unknown_class_{class_id}")
                 if class_name not in result:
-                    result[class_name] = []
-                
+                    result[class_name] = {}
+
                 # 텍스트를 문장 형태로 결합하여 저장
-                combined_text = ' '.join(included_texts)  # 단어를 공백으로 구분하여 결합
-                # 텍스트를 "texts_1", "texts_2" 형태로 저장
-                text_entry = {"texts_" + str(len(result[class_name]) + 1): [combined_text]}
-                result[class_name].append(text_entry)
-        
+                combined_text = ' '.join(included_texts)
+                # "texts_1", "texts_2" 형태로 저장
+                text_entry_key = f"texts_{len(result[class_name]) + 1}"
+                result[class_name][text_entry_key] = combined_text
+
         return result
 
     
